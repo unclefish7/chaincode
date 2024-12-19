@@ -1,0 +1,138 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "version": "1.0.0",
+        "title": "FileSign API",
+        "description": "文件签名与验证系统API"
+    },
+    "host": "localhost:3000",
+    "basePath": "/api",
+    "schemes": ["http"],
+    "paths": {
+        "/files": {
+            "post": {
+                "summary": "存储文件签名记录",
+                "parameters": [{
+                    "in": "body",
+                    "name": "body",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "fileHash": { "type": "string" },
+                            "encryptedSignature": { "type": "string" },
+                            "owner": { "type": "string" }
+                        },
+                        "required": ["fileHash", "encryptedSignature", "owner"]
+                    }
+                }],
+                "responses": {
+                    "200": {
+                        "description": "存储成功",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "fileHash": { "type": "string" },
+                                "encryptedSignature": { "type": "string" },
+                                "owner": { "type": "string" },
+                                "timestamp": { "type": "string" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/verify": {
+            "post": {
+                "summary": "验证文件签名",
+                "parameters": [{
+                    "in": "body",
+                    "name": "body",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "fileHash": { "type": "string", "description": "文件哈希值" }
+                        },
+                        "required": ["fileHash"]
+                    }
+                }],
+                "responses": {
+                    "200": {
+                        "description": "验证结果",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "isValid": { "type": "boolean" },
+                                "message": { "type": "string" },
+                                "details": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fileExists": { "type": "boolean" },
+                                        "hashMatches": { "type": "boolean" },
+                                        "fileRecord": {
+                                            "type": "object",
+                                            "properties": {
+                                                "fileHash": { "type": "string" },
+                                                "owner": { "type": "string" },
+                                                "timestamp": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/sign": {
+            "post": {
+                "summary": "使用公钥对文件哈希生成签名",
+                "parameters": [{
+                    "in": "body",
+                    "name": "body",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "fileHash": { "type": "string" }
+                        },
+                        "required": ["fileHash"]
+                    }
+                }],
+                "responses": {
+                    "200": {
+                        "description": "签名生成成功",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "encryptedSignature": { "type": "string" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/hash": {
+            "post": {
+                "summary": "生成文件哈希",
+                "parameters": [{
+                    "in": "formData",
+                    "name": "file",
+                    "type": "file",
+                    "required": true,
+                    "description": "要生成哈希的文件"
+                }],
+                "responses": {
+                    "200": {
+                        "description": "哈希生成成功",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "fileHash": { "type": "string" }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
