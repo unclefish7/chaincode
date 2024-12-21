@@ -1,121 +1,206 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { v4 as uuidv4 } from 'uuid'
 
-const file = ref(null)
-const fileHash = ref('')
-const encryptedSignature = ref('')
-const owner = ref('')
-const verificationResult = ref(null)
+const user = ref(null)
+const availableItems = ref([])
+const borrowedItems = ref([])
+const rentedItems = ref([])
+const itemHistory = ref([])
+const errorMessage = ref('')
 
-const axiosInstance = axios.create({
-  baseURL: 'http://localhost:3000/api',
-  headers: {
-    'Content-Type': 'application/json'
+const users = ref(JSON.parse(localStorage.getItem('users')) || [
+  { username: 'Alice', password: 'Alice' },
+  { username: 'Bob', password: 'Bob' }
+])
+
+const saveUsers = () => {
+  localStorage.setItem('users', JSON.stringify(users.value))
+}
+
+const login = (username, password) => {
+  const foundUser = users.value.find(u => u.username === username && u.password === password)
+  if (foundUser) {
+    user.value = foundUser
+    localStorage.setItem('user', JSON.stringify(user.value))
+    fetchItems()
+  } else {
+    errorMessage.value = '用户名或密码错误'
   }
-})
+}
 
-axiosInstance.interceptors.request.use(config => {
-  config.headers['Access-Control-Allow-Origin'] = '*'
-  return config
-})
+const register = (username, password) => {
+  const existingUser = users.value.find(u => u.username === username)
+  if (existingUser) {
+    errorMessage.value = '用户名已存在'
+  } else {
+    const newUser = { username, password }
+    users.value.push(newUser)
+    saveUsers()
+    user.value = newUser
+    localStorage.setItem('user', JSON.stringify(user.value))
+    fetchItems()
+  }
+}
 
-const handleFileUpload = async () => {
-  if (!file.value) {
-    console.error('No file selected')
+const logout = () => {
+  user.value = null
+  localStorage.removeItem('user')
+  location.reload()
+}
+
+const fetchItems = async () => {
+  try {
+    const response = await axios.get('http://localhost:3000/api/items/all')
+    const allItems = response.data
+
+    availableItems.value = allItems.filter(item => item.status === 'available')
+    borrowedItems.value = allItems.filter(item => item.borrower === user.value.username)
+    rentedItems.value = allItems.filter(item => item.owner === user.value.username)
+  } catch (error) {
+    console.error('Fetch items error:', error)
+    errorMessage.value = '获取物品列表失败'
+  }
+}
+
+const returnItem = async (itemId) => {
+  try {
+    await axios.post('http://localhost:3000/api/items/return', { itemId })
+    fetchItems()
+  } catch (error) {
+    console.error('Return item error:', error)
+    errorMessage.value = '归还物品失败'
+  }
+}
+
+const deleteItem = async (itemId) => {
+  const item = rentedItems.value.find(item => item.itemId === itemId)
+  if (item && item.status === 'borrowed') {
+    errorMessage.value = '物品正在被借用，无法删除'
     return
   }
-
-  const formData = new FormData()
-  formData.append('file', file.value)
-
   try {
-    const response = await axiosInstance.post('/files/hash', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-    fileHash.value = response.data.fileHash
+    await axios.post('http://localhost:3000/api/items/delete', { itemId })
+    fetchItems()
   } catch (error) {
-    console.error('Error generating hash:', error)
+    console.error('Delete item error:', error)
+    errorMessage.value = '删除物品失败'
   }
 }
 
-const handleGenerateSignature = async () => {
+const addItem = async (name) => {
+  const itemId = uuidv4()
   try {
-    const response = await axiosInstance.post('/files/sign', { fileHash: fileHash.value })
-    encryptedSignature.value = response.data.encryptedSignature
+    await axios.post('http://localhost:3000/api/items/add', { itemId, name, owner: user.value.username })
+    fetchItems()
   } catch (error) {
-    console.error('Error generating signature:', error)
+    console.error('Add item error:', error)
+    errorMessage.value = '添加物品失败'
   }
 }
 
-const handleStoreFile = async () => {
-  if (!fileHash.value || !encryptedSignature.value || !owner.value) {
-    console.error('Missing required fields')
+const borrowItem = async (itemId) => {
+  const item = availableItems.value.find(item => item.itemId === itemId)
+  if (item && item.owner === user.value.username) {
+    errorMessage.value = '不能借用自己的物品'
     return
   }
-
   try {
-    console.log('Sending data:', {
-      fileHash: fileHash.value,
-      encryptedSignature: encryptedSignature.value,
-      owner: owner.value
-    })
-    const response = await axiosInstance.post('/files', {
-      fileHash: fileHash.value,
-      encryptedSignature: encryptedSignature.value,
-      owner: owner.value
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    console.log('File stored:', response.data)
+    await axios.post('http://localhost:3000/api/items/borrow', { itemId, borrower: user.value.username })
+    fetchItems()
   } catch (error) {
-    console.error('Error storing file:', error)
+    console.error('Borrow item error:', error)
+    errorMessage.value = '租借物品失败'
   }
 }
 
-const handleVerifyFile = async () => {
+const fetchItemHistory = async (itemId) => {
   try {
-    const response = await axiosInstance.post('/files/verify', { fileHash: fileHash.value })
-    verificationResult.value = response.data
+    const response = await axios.get('http://localhost:3000/api/items/history', { params: { itemId } })
+    itemHistory.value = response.data.map(record => ({
+      ...record,
+      value: record.value ? JSON.parse(record.value) : null
+    }))
   } catch (error) {
-    console.error('Error verifying file:', error)
+    console.error('Fetch item history error:', error)
+    errorMessage.value = '获取物品历史记录失败'
   }
 }
 
-const handleFileChange = (e) => {
-  file.value = e.target.files[0]
-}
+onMounted(() => {
+  const storedUser = localStorage.getItem('user')
+  if (storedUser) {
+    user.value = JSON.parse(storedUser)
+    fetchItems()
+  }
+})
 </script>
 
 <template>
   <div>
-    <h1>文件签名系统</h1>
-
-    <div>
-      <input type="file" @change="handleFileChange" />
-      <button @click="handleFileUpload">生成哈希</button>
+    <div style="width: 25%; float: left;">
+      <div v-if="!user">
+        <h2>登录</h2>
+        <input v-model="username" placeholder="用户名" />
+        <input v-model="password" type="password" placeholder="密码" />
+        <button @click="login(username, password)">登录</button>
+        <h2>注册</h2>
+        <input v-model="newUsername" placeholder="用户名" />
+        <input v-model="newPassword" type="password" placeholder="密码" />
+        <button @click="register(newUsername, newPassword)">注册</button>
+      </div>
+      <div v-else>
+        <h2>当前用户</h2>
+        <p>{{ user.username }}</p>
+        <button @click="logout">登出</button>
+      </div>
+      <div v-if="errorMessage" style="color: red;">
+        <p>{{ errorMessage }}</p>
+      </div>
     </div>
-
-    <div v-if="fileHash">
-      <p>文件哈希: {{ fileHash }}</p>
-      <button @click="handleGenerateSignature">生成签名</button>
-    </div>
-
-    <div v-if="encryptedSignature">
-      <p>签名: {{ encryptedSignature }}</p>
-      <input v-model="owner" placeholder="输入文件所有者" />
-      <button @click="handleStoreFile">上链存储</button>
-    </div>
-
-    <div>
-      <button @click="handleVerifyFile">验证文件</button>
-      <div v-if="verificationResult">
-        <p>验证结果: {{ verificationResult.message }}</p>
-        <pre>{{ verificationResult.details }}</pre>
+    <div style="width: 75%; float: right;">
+      <div>
+        <h2>可借用物品</h2>
+        <ul>
+          <li v-for="item in availableItems" :key="item.itemId">
+            <p>名称: {{ item.name }}</p>
+            <p>所有者: {{ item.owner }}</p>
+            <button @click="borrowItem(item.itemId)" :disabled="item.owner === user.username">租借</button>
+          </li>
+        </ul>
+      </div>
+      <div style="width: 50%; float: left;">
+        <h2>我借的物品</h2>
+        <ul>
+          <li v-for="item in borrowedItems" :key="item.itemId">
+            {{ item.name }}
+            <button @click="returnItem(item.itemId)">归还</button>
+          </li>
+        </ul>
+      </div>
+      <div style="width: 50%; float: right;">
+        <h2>我租出去的物品</h2>
+        <ul>
+          <li v-for="item in rentedItems" :key="item.itemId">
+            {{ item.name }}
+            <button @click="deleteItem(item.itemId)" :disabled="item.status === 'borrowed'">删除</button>
+            <button @click="fetchItemHistory(item.itemId)">查看历史</button>
+          </li>
+        </ul>
+        <input v-model="newItemName" placeholder="物品名称" />
+        <button @click="addItem(newItemName)">添加物品</button>
+        <div v-if="itemHistory.length">
+          <h3>物品历史记录</h3>
+          <ul>
+            <li v-for="history in itemHistory" :key="history.txId">
+              <p>交易ID: {{ history.txId }}</p>
+              <p>时间: {{ new Date(history.timestamp.seconds * 1000).toLocaleString() }}</p>
+              <p v-if="history.isDelete">已删除</p>
+              <p v-else>状态: {{ history.value.status }}</p>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
