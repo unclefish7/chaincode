@@ -3,10 +3,14 @@ import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes: [
     {
       path: '/',
+      redirect: '/login'  // 添加重定向
+    },
+    {
+      path: '/login',
       name: 'login',
       component: LoginView
     },
@@ -19,14 +23,19 @@ const router = createRouter({
   ]
 })
 
-// 导航守卫
 router.beforeEach((to, from, next) => {
-  const user = localStorage.getItem('user')
+  console.log('Navigation guard triggered', to.path) // 添加调试日志
+  const userStr = localStorage.getItem('user')
+  const user = userStr ? JSON.parse(userStr) : null
+
   if (to.meta.requiresAuth && !user) {
-    next({ name: 'login' })
-  } else if (to.name === 'login' && user) {
-    next({ name: 'home' })
+    console.log('Unauthorized access, redirecting to login')
+    next('/login')
+  } else if (to.path === '/login' && user) {
+    console.log('Already logged in, redirecting to home')
+    next('/home')
   } else {
+    console.log('Proceeding with navigation')
     next()
   }
 })
