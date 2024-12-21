@@ -9,90 +9,113 @@ class FileSign extends Contract {
      * 初始化账本
      */
     async InitLedger(ctx) {
-        const files = [
+        const items = [
             {
-                fileHash: 'hash123',
-                signature: 'signature123',
+                itemId: 'item1',
+                name: 'Laptop',
                 owner: 'Alice',
-
+                status: 'available',
             },
         ];
 
-        for (const file of files) {
-            await ctx.stub.putState(file.fileHash, Buffer.from(stringify(sortKeysRecursive(file))));
+        for (const item of items) {
+            await ctx.stub.putState(item.itemId, Buffer.from(stringify(sortKeysRecursive(item))));
         }
         return 'Ledger initialized with sample data.';
     }
 
     /**
-     * 存储文件签名记录
+     * 添加物品
      */
-    async storeFile(ctx, fileHash, encryptedSignature, owner) {
-        console.log(`Storing file: ${fileHash}, ${encryptedSignature}, ${owner}`);
-        
-        // 构建文件记录
-        const fileRecord = {
-            fileHash,
-            encryptedSignature,
+    async addItem(ctx, itemId, name, owner) {
+        const item = {
+            itemId,
+            name,
             owner,
+            status: 'available',
         };
 
-        console.log(`File record: ${JSON.stringify(fileRecord)}`);
-
-        // 存储到区块链
-        await ctx.stub.putState(fileHash, Buffer.from(stringify(sortKeysRecursive(fileRecord))));
-        return JSON.stringify(fileRecord);
+        await ctx.stub.putState(item.itemId, Buffer.from(stringify(sortKeysRecursive(item))));
+        return JSON.stringify(item);
     }
 
     /**
-     * 验证文件签名
+     * 删除物品
      */
-    async verifyFile(ctx, fileHash, signature) {
-        // 获取文件记录
-        const fileJSON = await ctx.stub.getState(fileHash);
-        if (!fileJSON || fileJSON.length === 0) {
-            throw new Error(`File with hash ${fileHash} does not exist`);
+    async deleteItem(ctx, itemId) {
+        const exists = await this.itemExists(ctx, itemId);
+        if (!exists) {
+            throw new Error(`The item with ID ${itemId} does not exist`);
         }
 
-        const fileRecord = JSON.parse(fileJSON.toString());
+        await ctx.stub.deleteState(itemId);
+        return `Item ${itemId} has been deleted`;
+    }
 
-        // 验证签名是否匹配
-        if (fileRecord.signature !== signature) {
-            throw new Error('Signature does not match the stored record.');
+    /**
+     * 租借物品
+     */
+    async borrowItem(ctx, itemId, borrower) {
+        const itemJSON = await ctx.stub.getState(itemId);
+        if (!itemJSON || itemJSON.length === 0) {
+            throw new Error(`Item with ID ${itemId} does not exist`);
         }
 
-        return {
-            message: 'File verification successful',
-            fileHash: fileRecord.fileHash,
-            owner: fileRecord.owner,
-            timestamp: fileRecord.timestamp,
-        };
-    }
-
-    /**
-     * 查询文件记录
-     */
-    async getFileRecord(ctx, fileHash) {
-        const fileJSON = await ctx.stub.getState(fileHash);
-        if (!fileJSON || fileJSON.length === 0) {
-            throw new Error(`File with hash ${fileHash} does not exist`);
+        const item = JSON.parse(itemJSON.toString());
+        if (item.status !== 'available') {
+            throw new Error(`Item ${itemId} is not available for borrowing`);
         }
-        return fileJSON.toString();
+
+        item.status = 'borrowed';
+        item.borrower = borrower;
+
+        await ctx.stub.putState(itemId, Buffer.from(stringify(sortKeysRecursive(item))));
+        return JSON.stringify(item);
     }
 
     /**
-     * 判断文件是否存在
+     * 归还物品
      */
-    async fileExists(ctx, fileHash) {
-        const fileJSON = await ctx.stub.getState(fileHash);
-        return fileJSON && fileJSON.length > 0;
+    async returnItem(ctx, itemId) {
+        const itemJSON = await ctx.stub.getState(itemId);
+        if (!itemJSON || itemJSON.length === 0) {
+            throw new Error(`Item with ID ${itemId} does not exist`);
+        }
+
+        const item = JSON.parse(itemJSON.toString());
+        if (item.status !== 'borrowed') {
+            throw new Error(`Item ${itemId} is not currently borrowed`);
+        }
+
+        item.status = 'available';
+        delete item.borrower;
+
+        await ctx.stub.putState(itemId, Buffer.from(stringify(sortKeysRecursive(item))));
+        return JSON.stringify(item);
     }
 
     /**
-     * 查询文件的历史记录
+     * 查询所有物品的当前状态
      */
-    async getFileHistory(ctx, fileHash) {
-        const historyIterator = await ctx.stub.getHistoryForKey(fileHash);
+    async getAllItems(ctx) {
+        const iterator = await ctx.stub.getStateByRange('', '');
+        const items = [];
+        let result = await iterator.next();
+    
+        while (!result.done) {
+            const item = JSON.parse(result.value.value.toString('utf8'));
+            items.push(item);
+            result = await iterator.next();
+        }
+    
+        return JSON.stringify(items);
+    }
+
+    /**
+     * 查询物品的历史记录
+     */
+    async getItemHistory(ctx, itemId) {
+        const historyIterator = await ctx.stub.getHistoryForKey(itemId);
         const history = [];
         let result = await historyIterator.next();
 
@@ -108,6 +131,14 @@ class FileSign extends Contract {
         }
 
         return JSON.stringify(history);
+    }
+
+    /**
+     * 判断物品是否存在
+     */
+    async itemExists(ctx, itemId) {
+        const itemJSON = await ctx.stub.getState(itemId);
+        return itemJSON && itemJSON.length > 0;
     }
 }
 

@@ -1,17 +1,10 @@
 const { Gateway, Wallets } = require('fabric-network');
-const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 
 // 配置路径
 const ccpPath = path.resolve(__dirname, '..', 'networkConfig.json');
 const walletPath = path.resolve(__dirname, '..', 'wallet');
-const PRIVATE_KEY_PATH = path.join(__dirname, '..', 'keys', 'private.pem');
-const PUBLIC_KEY_PATH = path.join(__dirname, '..', 'keys', 'public.pem');
-
-// 文件上传配置
-const upload = multer({ dest: 'uploads/' });
 
 // 初始化 Gateway 和 Contract
 async function initializeGateway(identity) {
@@ -56,150 +49,128 @@ async function initializeGateway(identity) {
     }
 }
 
-// 文件哈希生成
-exports.generateHash = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: '未上传文件' });
-        }
-
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-
-        fs.unlinkSync(req.file.path);
-        res.status(200).json({ fileHash });
-    } catch (error) {
-        console.error('生成哈希错误:', error);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 使用公钥加密生成签名
-exports.generateSignature = async (req, res) => {
-    const { fileHash } = req.body;
-    if (!fileHash) {
-        return res.status(400).json({ error: '缺少文件哈希' });
-    }
-
-    try {
-        // 读取公钥
-        const publicKey = fs.readFileSync(PUBLIC_KEY_PATH, 'utf8');
-        
-        // 使用公钥加密文件哈希
-        const encryptedSignature = crypto.publicEncrypt(publicKey, Buffer.from(fileHash)).toString('base64');
-
-        res.status(200).json({ encryptedSignature });
-    } catch (error) {
-        console.error('生成签名错误:', error);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// 存储文件签名记录
-exports.storeFile = async (req, res) => {
-    const { fileHash, encryptedSignature, owner } = req.body;
-    
-    if (!fileHash || !encryptedSignature || !owner) {
+// 添加物品
+exports.addItem = async (req, res) => {
+    const { itemId, name, owner } = req.body;
+    if (!itemId || !name || !owner) {
         return res.status(400).json({ error: '缺少必要参数' });
     }
 
     let gateway;
     try {
-        console.log(`Storing file: ${fileHash}, ${encryptedSignature}, ${owner}`);
-        
         const { gateway: gw, contract } = await initializeGateway('Admin');
         gateway = gw;
 
-        const result = await contract.submitTransaction('storeFile', fileHash, encryptedSignature, owner);
-        console.log('Transaction result:', result.toString());
+        const result = await contract.submitTransaction('addItem', itemId, name, owner);
         res.status(200).json(JSON.parse(result.toString()));
     } catch (error) {
-        console.error('存储文件错误:', error);
+        console.error('添加物品错误:', error);
         res.status(500).json({ error: error.message });
     } finally {
         if (gateway) gateway.disconnect();
     }
 };
 
-// 验证文件签名
-exports.verifyFile = async (req, res) => {
-    const { fileHash } = req.body;
-    
-    // 验证参数完整性
-    if (!fileHash) {
-        return res.status(400).json({ 
-            isValid: false, 
-            message: '缺少文件哈希'
-        });
+// 删除物品
+exports.deleteItem = async (req, res) => {
+    const { itemId } = req.body;
+    if (!itemId) {
+        return res.status(400).json({ error: '缺少物品ID' });
     }
 
     let gateway;
     try {
-        // 1. 查询区块链记录
         const { gateway: gw, contract } = await initializeGateway('Admin');
         gateway = gw;
 
-        let fileRecord;
-        let fileExists = false;
-        
-        try {
-            const result = await contract.evaluateTransaction('getFileRecord', fileHash);
-            fileRecord = JSON.parse(result.toString());
-            fileExists = true;
-        } catch (error) {
-            return res.status(404).json({
-                isValid: false,
-                message: '文件记录不存在',
-                details: {
-                    fileExists: false
-                }
-            });
-        }
-
-        // 2. 使用私钥解密签名
-        let decryptedHash;
-        try {
-            const privateKey = fs.readFileSync(PRIVATE_KEY_PATH, 'utf8');
-            decryptedHash = crypto.privateDecrypt(privateKey, Buffer.from(fileRecord.encryptedSignature, 'base64')).toString('utf8');
-        } catch (error) {
-            return res.status(400).json({
-                isValid: false,
-                message: '解密签名失败',
-                details: {
-                    error: '私钥格式错误或签名格式错误'
-                }
-            });
-        }
-
-        // 3. 验证解密后的哈希是否匹配
-        const hashMatches = decryptedHash === fileHash;
-
-        // 4. 返回完整的验证结果
-        res.status(200).json({
-            isValid: fileExists && hashMatches,
-            message: fileExists && hashMatches 
-                ? '验证通过' 
-                : '验证失败',
-            details: {
-                fileExists,
-                hashMatches,
-                fileRecord: {
-                    fileHash: fileRecord.fileHash,
-                    owner: fileRecord.owner,
-                    timestamp: fileRecord.timestamp
-                }
-            }
-        });
-
+        const result = await contract.submitTransaction('deleteItem', itemId);
+        res.status(200).json({ message: result.toString() });
     } catch (error) {
-        console.error('验证文件错误:', error);
-        res.status(500).json({ 
-            isValid: false,
-            message: '验证过程发生错误',
-            details: {
-                error: error.message
-            }
-        });
+        console.error('删除物品错误:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        if (gateway) gateway.disconnect();
+    }
+};
+
+// 租借物品
+exports.borrowItem = async (req, res) => {
+    const { itemId, borrower } = req.body;
+    if (!itemId || !borrower) {
+        return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    let gateway;
+    try {
+        const { gateway: gw, contract } = await initializeGateway('Admin');
+        gateway = gw;
+
+        const result = await contract.submitTransaction('borrowItem', itemId, borrower);
+        res.status(200).json(JSON.parse(result.toString()));
+    } catch (error) {
+        console.error('租借物品错误:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        if (gateway) gateway.disconnect();
+    }
+};
+
+// 归还物品
+exports.returnItem = async (req, res) => {
+    const { itemId } = req.body;
+    if (!itemId) {
+        return res.status(400).json({ error: '缺少物品ID' });
+    }
+
+    let gateway;
+    try {
+        const { gateway: gw, contract } = await initializeGateway('Admin');
+        gateway = gw;
+
+        const result = await contract.submitTransaction('returnItem', itemId);
+        res.status(200).json(JSON.parse(result.toString()));
+    } catch (error) {
+        console.error('归还物品错误:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        if (gateway) gateway.disconnect();
+    }
+};
+
+// 查询所有物品
+exports.getAllItems = async (req, res) => {
+    let gateway;
+    try {
+        const { gateway: gw, contract } = await initializeGateway('Admin');
+        gateway = gw;
+
+        const result = await contract.evaluateTransaction('getAllItems');
+        res.status(200).json(JSON.parse(result.toString()));
+    } catch (error) {
+        console.error('查询所有物品错误:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        if (gateway) gateway.disconnect();
+    }
+};
+
+// 查询物品历史记录
+exports.getItemHistory = async (req, res) => {
+    const { itemId } = req.query;
+    if (!itemId) {
+        return res.status(400).json({ error: '缺少物品ID' });
+    }
+
+    let gateway;
+    try {
+        const { gateway: gw, contract } = await initializeGateway('Admin');
+        gateway = gw;
+
+        const result = await contract.evaluateTransaction('getItemHistory', itemId);
+        res.status(200).json(JSON.parse(result.toString()));
+    } catch (error) {
+        console.error('查询物品历史记录错误:', error);
+        res.status(500).json({ error: error.message });
     } finally {
         if (gateway) gateway.disconnect();
     }
