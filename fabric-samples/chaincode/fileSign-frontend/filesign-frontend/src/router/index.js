@@ -7,7 +7,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/login'  // 添加重定向
+      redirect: '/login'
     },
     {
       path: '/login',
@@ -19,24 +19,54 @@ const router = createRouter({
       name: 'home',
       component: HomeView,
       meta: { requiresAuth: true }
+    },
+    // 添加通配符路由，捕获所有未匹配的路径
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/login'
     }
   ]
 })
 
 router.beforeEach((to, from, next) => {
-  console.log('Navigation guard triggered', to.path) // 添加调试日志
-  const userStr = localStorage.getItem('user')
-  const user = userStr ? JSON.parse(userStr) : null
+  try {
+    // 验证 localStorage 中的用户数据是否有效
+    const userStr = localStorage.getItem('user')
+    let user = null
+    
+    if (userStr) {
+      try {
+        user = JSON.parse(userStr)
+        // 验证用户对象是否有效
+        if (!user || !user.username) {
+          console.log('Invalid user data, clearing localStorage')
+          localStorage.removeItem('user')
+          user = null
+        }
+      } catch (e) {
+        console.log('Error parsing user data, clearing localStorage')
+        localStorage.removeItem('user')
+        user = null
+      }
+    }
 
-  if (to.meta.requiresAuth && !user) {
-    console.log('Unauthorized access, redirecting to login')
+    console.log('Current route:', to.path)
+    console.log('User status:', user ? 'logged in' : 'not logged in')
+
+    if (to.meta.requiresAuth && !user) {
+      console.log('Unauthorized access, redirecting to login')
+      next('/login')
+    } else if (to.path === '/login' && user) {
+      console.log('Already logged in, redirecting to home')
+      next('/home')
+    } else {
+      console.log('Proceeding with navigation')
+      next()
+    }
+  } catch (error) {
+    console.error('Router guard error:', error)
+    localStorage.removeItem('user')
     next('/login')
-  } else if (to.path === '/login' && user) {
-    console.log('Already logged in, redirecting to home')
-    next('/home')
-  } else {
-    console.log('Proceeding with navigation')
-    next()
   }
 })
 
