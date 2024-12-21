@@ -138,8 +138,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <div style="width: 25%; float: left;">
+  <div class="container">
+    <div class="sidebar">
       <div v-if="!user">
         <h2>登录</h2>
         <input v-model="username" placeholder="用户名" />
@@ -155,51 +155,57 @@ onMounted(() => {
         <p>{{ user.username }}</p>
         <button @click="logout">登出</button>
       </div>
-      <div v-if="errorMessage" style="color: red;">
+      <div v-if="errorMessage" class="error-message">
         <p>{{ errorMessage }}</p>
       </div>
     </div>
-    <div style="width: 75%; float: right;">
-      <div>
+    <div class="main-content">
+      <div class="section">
         <h2>可借用物品</h2>
-        <ul>
-          <li v-for="item in availableItems" :key="item.itemId">
+        <div class="items-grid">
+          <div v-for="item in availableItems" :key="item.itemId" class="item">
             <p>名称: {{ item.name }}</p>
             <p>所有者: {{ item.owner }}</p>
             <button @click="borrowItem(item.itemId)" :disabled="item.owner === user.username">租借</button>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
-      <div style="width: 50%; float: left;">
-        <h2>我借的物品</h2>
-        <ul>
-          <li v-for="item in borrowedItems" :key="item.itemId">
-            {{ item.name }}
-            <button @click="returnItem(item.itemId)">归还</button>
-          </li>
-        </ul>
-      </div>
-      <div style="width: 50%; float: right;">
-        <h2>我租出去的物品</h2>
-        <ul>
-          <li v-for="item in rentedItems" :key="item.itemId">
-            {{ item.name }}
-            <button @click="deleteItem(item.itemId)" :disabled="item.status === 'borrowed'">删除</button>
-            <button @click="fetchItemHistory(item.itemId)">查看历史</button>
-          </li>
-        </ul>
-        <input v-model="newItemName" placeholder="物品名称" />
-        <button @click="addItem(newItemName)">添加物品</button>
-        <div v-if="itemHistory.length">
-          <h3>物品历史记录</h3>
-          <ul>
-            <li v-for="history in itemHistory" :key="history.txId">
-              <p>交易ID: {{ history.txId }}</p>
-              <p>时间: {{ new Date(history.timestamp.seconds * 1000).toLocaleString() }}</p>
-              <p v-if="history.isDelete">已删除</p>
-              <p v-else>状态: {{ history.value.status }}</p>
-            </li>
-          </ul>
+      <div class="hstack">
+        <div class="half-section">
+          <div class="section">
+            <h2>我借的物品</h2>
+            <ul>
+              <li v-for="item in borrowedItems" :key="item.itemId" class="item">
+                {{ item.name }}
+                <button @click="returnItem(item.itemId)">归还</button>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="half-section">
+          <div class="section">
+            <h2>我租出去的物品</h2>
+            <ul>
+              <li v-for="item in rentedItems" :key="item.itemId" class="item">
+                {{ item.name }}
+                <button @click="deleteItem(item.itemId)" :disabled="item.status === 'borrowed'">删除</button>
+                <button @click="fetchItemHistory(item.itemId)">查看历史</button>
+              </li>
+            </ul>
+            <input v-model="newItemName" placeholder="物品名称" />
+            <button @click="addItem(newItemName)">添加物品</button>
+            <div v-if="itemHistory.length">
+              <h3>物品历史记录</h3>
+              <ul>
+                <li v-for="history in itemHistory" :key="history.txId" class="item">
+                  <p>交易ID: {{ history.txId }}</p>
+                  <p>时间: {{ new Date(history.timestamp.seconds * 1000).toLocaleString() }}</p>
+                  <p v-if="history.isDelete">已删除</p>
+                  <p v-else>状态: {{ history.value.status }}</p>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -207,5 +213,63 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 样式可以根据需要进行调整 */
+.container {
+  display: flex;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: 25%;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin-right: 20px;
+  box-sizing: border-box;
+}
+
+.main-content {
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.section {
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.items-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.item {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  width: calc(33.333% - 10px);
+}
+
+.hstack {
+  display: flex;
+  justify-content: space-between;
+}
+
+.half-section {
+  width: 48%;
+  box-sizing: border-box;
+}
+
+.error-message {
+  color: red;
+}
 </style>
