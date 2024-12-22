@@ -275,11 +275,52 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 原有的样式保持不变，添加header相关样式 */
+.el-main {
+  padding: 20px 40px;  /* 增加内边距 */
+  background-color: #f5f7fa;  /* 设置背景色 */
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.mb-20 {
+  margin-bottom: 30px;  /* 增加上下间距 */
+}
+
+.el-row {
+  margin-bottom: 20px;  /* 行间距 */
+}
+
 .el-header {
   background-color: #fff;
   border-bottom: 1px solid #dcdfe6;
   padding: 0 20px;
+}
+
+.el-card {
+  min-height: 300px;  /* 设置最小高度 */
+  height: 100%;      /* 保持等高 */
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.el-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.el-table {
+  height: calc(100% - 60px);  /* 表格高度自适应 */
 }
 
 .header-content {
@@ -295,5 +336,44 @@ onMounted(() => {
   gap: 12px;
 }
 
-/* ... 其他原有样式 ... */
+/* 美化输入框 */
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  transform: translateY(-2px);
+}
+
+/* 美化按钮 */
+:deep(.el-button) {
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* 美化标签页 */
+:deep(.el-tabs__nav) {
+  width: 100%;
+}
+
+:deep(.el-tabs__item) {
+  width: 50%;
+  text-align: center;
+  font-size: 16px;
+  color: #606266;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #409eff;
+  font-weight: 600;
+}
 </style>
