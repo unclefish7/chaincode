@@ -61,7 +61,7 @@ const register = async (username, password) => {
     <el-card class="login-card">
       <template #header>
         <div class="card-header">
-          <h2>物品管理系统</h2>
+          <h2>物品租赁系统</h2>
         </div>
       </template>
 

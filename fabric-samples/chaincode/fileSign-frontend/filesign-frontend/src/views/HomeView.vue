@@ -119,7 +119,7 @@ onMounted(() => {
       <!-- 顶部导航栏 -->
       <el-header>
         <div class="header-content">
-          <h2>物品管理系统</h2>
+          <h2>物品租赁系统</h2>
           <div class="user-info">
             <el-avatar size="small">{{ user.username.charAt(0) }}</el-avatar>
             <span>{{ user.username }}</span>
