@@ -261,7 +261,7 @@ onMounted(() => {
               :timestamp="new Date(history.timestamp.seconds * 1000).toLocaleString()"
               :type="history.isDelete ? 'danger' : 'primary'"
             >
-              <el-card>
+              <el-card class="history-card">
                 <h4>交易ID: {{ history.txId }}</h4>
                 <p v-if="history.isDelete">物品已删除</p>
                 <p v-else>状态: {{ history.value.status }}</p>
@@ -375,5 +375,11 @@ onMounted(() => {
 :deep(.el-tabs__item.is-active) {
   color: #409eff;
   font-weight: 600;
+}
+
+/* 调整历史记录卡片的高度 */
+.history-card {
+  padding: 10px;
+  min-height: 50px;
 }
 </style>
